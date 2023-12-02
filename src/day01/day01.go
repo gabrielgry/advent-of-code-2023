@@ -162,7 +162,7 @@ func getSumOfCodes(lines []string) int {
 }
 
 func main() {
-	lines, err := readLinesFromFile("../../inputs/day01/input")
+	lines, err := readLinesFromFile("../../inputs/day01/input.txt")
 
 	if err != nil {
 		log.Fatal("Could not open the input file")
