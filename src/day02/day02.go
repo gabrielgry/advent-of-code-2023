@@ -10,8 +10,6 @@ import (
 )
 
 func main() {
-	cubeQuantity := map[string]int{"red": 12, "green": 13, "blue": 14}
-
 	lines, err := readLinesFromFile("../../inputs/day02/input.txt")
 
 	if err != nil {
@@ -21,24 +19,21 @@ func main() {
 	sum := 0
 
 	for _, line := range lines {
-		game, isValidGame := validadeGame(line, cubeQuantity)
+		minCubeQuantity := getGameMinCubeQuantity(line)
 
-		if isValidGame {
-			sum = sum + game
-		}
+		power := minCubeQuantity["red"] * minCubeQuantity["green"] * minCubeQuantity["blue"]
+
+		sum = sum + power
 	}
 
 	fmt.Println(sum)
 }
 
-func validadeGame(line string, cubeQuantity map[string]int) (int, bool) {
-	header, setsString, _ := strings.Cut(line, ":")
-	game, err := strconv.Atoi(strings.TrimPrefix(header, "Game "))
+func getGameMinCubeQuantity(line string) map[string]int {
+	_, setsString, _ := strings.Cut(line, ":")
 
-	if err != nil {
-		log.Fatal("Could not convert header value to int")
-	}
-	
+	minCubeQuantity := map[string]int{"red": 0, "green": 0, "blue": 0}
+
 	for _, setString := range strings.Split(setsString, ";") {
 		for _, cubeString := range strings.Split(setString, ",") {
 			cubeCountString, cubeColor, _ := strings.Cut(strings.TrimSpace(cubeString), " ")
@@ -49,13 +44,13 @@ func validadeGame(line string, cubeQuantity map[string]int) (int, bool) {
 				log.Fatal("Could not convert cubeCountString to int")
 			}
 
-			if cubeCount > cubeQuantity[cubeColor] {
-				return game, false
+			if cubeCount > minCubeQuantity[cubeColor] {
+				minCubeQuantity[cubeColor] = cubeCount
 			}
 		}
 	}
 
-	return game, true
+	return minCubeQuantity
 }
 
 func readLinesFromFile(filename string) ([]string, error) {
