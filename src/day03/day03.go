@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -15,6 +16,18 @@ type FoundNumber struct {
 	Line   int
 	Start  int
 	End    int
+}
+
+type GearConnection struct {
+	Number int
+	X      int
+	Y      int
+}
+
+type Gear struct {
+	X       int
+	Y       int
+	Numbers []int
 }
 
 func findNumbers(line string, lineIndex int) []FoundNumber {
@@ -59,57 +72,113 @@ func findNumbers(line string, lineIndex int) []FoundNumber {
 	return foundNumbers
 }
 
-func hasSymbolOnRange(line string, start int, end int) bool {
+func hasSymbolOnRange(line string, lineIndex int, foundNumber FoundNumber) (bool, []GearConnection) {
+	var gears []GearConnection
+
 	for index, char := range line {
-		if index < start-1 || index > end+1 {
+		if index < foundNumber.Start-1 || index > foundNumber.End+1 || unicode.IsDigit(char) || char == '.' {
 			continue
 		}
 
-		if char != '.' && !unicode.IsDigit(char) {
-			return true
+		if char == '*' {
+			gears = append(gears, GearConnection{Number: foundNumber.Number, X: index, Y: lineIndex})
 		}
+
+		return true, gears
 	}
 
-	return false
+	return false, gears
 }
 
-func extractPartNumbers(foundNumbers []FoundNumber, lines []string) []int {
+func extractPartNumbers(foundNumbers []FoundNumber, lines []string) ([]int, []GearConnection) {
 	var partNumbers []int
+	var gears []GearConnection
 
 	for _, foundNumber := range foundNumbers {
-		isPartNumber := hasSymbolOnRange(lines[foundNumber.Line], foundNumber.Start, foundNumber.End)
+		isPartNumber, foundGears := hasSymbolOnRange(lines[foundNumber.Line], foundNumber.Line, foundNumber)
 
 		if !isPartNumber && foundNumber.Line > 0 {
-			isPartNumber = hasSymbolOnRange(lines[foundNumber.Line-1], foundNumber.Start, foundNumber.End)
+			isPartNumber, foundGears = hasSymbolOnRange(lines[foundNumber.Line-1], foundNumber.Line-1, foundNumber)
 		}
 
 		if !isPartNumber && foundNumber.Line < len(lines)-1 {
-			isPartNumber = hasSymbolOnRange(lines[foundNumber.Line+1], foundNumber.Start, foundNumber.End)
+			isPartNumber, foundGears = hasSymbolOnRange(lines[foundNumber.Line+1], foundNumber.Line+1, foundNumber)
 		}
 
 		if isPartNumber {
 			partNumbers = append(partNumbers, foundNumber.Number)
+			gears = append(gears, foundGears...)
 		}
 	}
 
-	return partNumbers
+	return partNumbers, gears
 }
 
-func partNumbersSum(lines []string) int {
+func mergeGearConnections(gearConnections []GearConnection) []Gear {
+	var gears []Gear
+
+	for _, gearConnection := range gearConnections {
+		updatedGear := false
+
+		for i, gear := range gears {
+			if gear.X == gearConnection.X && gear.Y == gearConnection.Y {
+				gears[i].Numbers = append(gear.Numbers, gearConnection.Number)
+				updatedGear = true
+			}
+		}
+
+		if !updatedGear {
+			var gear = Gear{
+				X:       gearConnection.X,
+				Y:       gearConnection.Y,
+				Numbers: []int{gearConnection.Number},
+			}
+
+			gears = append(gears, gear)
+		}
+
+	}
+
+	return gears
+}
+
+func getGearRatioSum(gears []Gear) int {
 	sum := 0
+
+	for _, gear := range gears {
+		if len(gear.Numbers) == 2 {
+			sum = sum + (gear.Numbers[0] * gear.Numbers[1])
+		}
+	}
+
+	return sum
+}
+
+func partNumbersSum(lines []string) (int, int) {
+	sum := 0
+	var gearConnections []GearConnection
+	possibleGears := 0
 
 	for lineIndex, line := range lines {
 		foundNumbers := findNumbers(line, lineIndex)
-		partNumbers := extractPartNumbers(foundNumbers, lines)
-		fmt.Println(partNumbers)
+		partNumbers, foundGearConnections := extractPartNumbers(foundNumbers, lines)
+
+		gearConnections = append(gearConnections, foundGearConnections...)
 
 		for _, partNumber := range partNumbers {
 			sum = sum + partNumber
 		}
 
+		possibleGears = possibleGears + strings.Count(line, "*")
 	}
 
-	return sum
+	fmt.Print(possibleGears)
+
+	gears := mergeGearConnections(gearConnections)
+
+	gearRatioSum := getGearRatioSum(gears)
+
+	return sum, gearRatioSum
 }
 
 func main() {
@@ -119,9 +188,10 @@ func main() {
 		log.Fatal("Could not open the input file")
 	}
 
-	sum := partNumbersSum(lines)
+	sum, gearRatioSum := partNumbersSum(lines)
 
-	fmt.Println(sum)
+	fmt.Printf("Parts sum: %d\n", sum)
+	fmt.Printf("Gear ration sum: %d\n", gearRatioSum)
 }
 
 func readLinesFromFile(filename string) ([]string, error) {
