@@ -20,7 +20,7 @@ type Mapping struct {
 }
 
 type Almanac struct {
-	Seeds        []int
+	Seeds        map[int]Mapping
 	Soils        map[int]Mapping
 	Fertilizers  map[int]Mapping
 	Waters       map[int]Mapping
@@ -30,13 +30,38 @@ type Almanac struct {
 	Locations    map[int]Mapping
 }
 
+func createSeedsForSeedMapping(seedMappings map[int]Mapping, soilMappings map[int]Mapping) []int {
+	var seeds []int
+
+	for _, seedMapping := range seedMappings {
+		seeds = append(seeds, seedMapping.Start)
+		seeds = append(seeds, seedMapping.End)
+
+		for _, soilMapping := range soilMappings {
+			if soilMapping.Start > seedMapping.Start && soilMapping.Start < seedMapping.End {
+				seeds = append(seeds, soilMapping.Start)
+			}
+
+			if soilMapping.End > seedMapping.Start && soilMapping.End < seedMapping.End {
+				seeds = append(seeds, soilMapping.End)
+			}
+		}
+	}
+
+	return seeds
+}
+
 func getLowestLocationCode(lines []string) int {
 
 	almanac := parseLines(lines)
 
+	lowestLocationCode := math.MaxInt
+
+	seeds := createSeedsForSeedMapping(almanac.Seeds, almanac.Soils)
+
 	var locations []int
 
-	for _, seed := range almanac.Seeds {
+	for _, seed := range seeds {
 		soil := getCode(almanac.Soils, seed)
 		fertilizer := getCode(almanac.Fertilizers, soil)
 		water := getCode(almanac.Waters, fertilizer)
@@ -47,8 +72,6 @@ func getLowestLocationCode(lines []string) int {
 
 		locations = append(locations, location)
 	}
-
-	lowestLocationCode := math.MaxInt
 
 	for _, location := range locations {
 		if location < lowestLocationCode {
@@ -82,8 +105,34 @@ func lineToMapping(line string) Mapping {
 	}
 }
 
+func seedLineToMapping(line string) map[int]Mapping {
+	fields := fieldsStringToNumber(strings.Fields(strings.TrimPrefix(line, "seeds:")))
+
+	seeds := make(map[int]Mapping)
+
+	for index := 0; index < len(fields); index = index + 1 {
+		if index%2 != 0 {
+			continue
+		}
+
+		seedStart := fields[index]
+		seedLength := fields[index+1]
+		seedEnd := seedStart + seedLength - 1
+
+		seeds[index] = Mapping{
+			Code:   index,
+			Start:  seedStart,
+			End:    seedEnd,
+			Length: seedLength,
+		}
+	}
+
+	return seeds
+}
+
 func parseLines(lines []string) Almanac {
 	almanac := Almanac{
+		Seeds:        make(map[int]Mapping),
 		Soils:        make(map[int]Mapping),
 		Fertilizers:  make(map[int]Mapping),
 		Waters:       make(map[int]Mapping),
@@ -110,8 +159,7 @@ func parseLines(lines []string) Almanac {
 
 		switch section {
 		case "seeds":
-			seeds := fieldsStringToNumber(strings.Fields(strings.TrimPrefix(line, "seeds:")))
-			almanac.Seeds = seeds
+			almanac.Seeds = seedLineToMapping(line)
 		case "seed-to-soil":
 			mapping := lineToMapping(line)
 			almanac.Soils[mapping.Code] = mapping
@@ -140,7 +188,7 @@ func parseLines(lines []string) Almanac {
 }
 
 func main() {
-	lines, err := readLinesFromFile("../../inputs/input.txt")
+	lines, err := readLinesFromFile("../../inputs/test.txt")
 
 	if err != nil {
 		log.Fatal("Could not open the input file")
