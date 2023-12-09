@@ -40,10 +40,17 @@ func main() {
 
 	winnings := part1(lines)
 	fmt.Println("Part 1:", winnings)
+	winnings2 := part2(lines)
+	fmt.Println("Part 2:", winnings2)
 }
 
 func part1(lines []string) int {
-	hands := parseLines(lines)
+	var hands []Hand
+
+	for _, line := range lines {
+		hand := parseLine(line)
+		hands = append(hands, hand)
+	}
 
 	sort.Slice(hands, func(i, j int) bool { return hands[i].Strength < hands[j].Strength })
 
@@ -55,15 +62,53 @@ func part1(lines []string) int {
 	return winnings
 }
 
-func parseLines(lines []string) []Hand {
+func part2(lines []string) int {
 	var hands []Hand
 
 	for _, line := range lines {
-		hand := parseLine(line)
+		hand := parseLineWithJoker(line)
 		hands = append(hands, hand)
 	}
 
-	return hands
+	sort.Slice(hands, func(i, j int) bool { return hands[i].Strength < hands[j].Strength })
+
+	winnings := 0
+	for index, hands := range hands {
+		winnings = winnings + hands.Bid*(index+1)
+	}
+
+	return winnings
+}
+
+func parseLineWithJoker(line string) Hand {
+	hand := Hand{
+		Labels: make(map[rune]int),
+	}
+
+	cardsString, bidString, _ := strings.Cut(line, " ")
+	fmt.Println(cardsString)
+
+	bid, _ := strconv.Atoi(bidString)
+	hand.Bid = bid
+
+	for _, card := range cardsString {
+		hand.Cards = append(hand.Cards, card)
+
+		if labelCount, ok := hand.Labels[card]; ok {
+			hand.Labels[card] = labelCount + 1
+		} else {
+			hand.Labels[card] = 1
+		}
+	}
+
+	morthedLabels := morthJoker(hand.Labels)
+	handType := getHandType(morthedLabels)
+	hand.Type = handType
+
+	strength := getHandStrengthWithJoker(hand)
+	hand.Strength = strength
+
+	return hand
 }
 
 func parseLine(line string) Hand {
@@ -95,33 +140,100 @@ func parseLine(line string) Hand {
 	return hand
 }
 
+func morthJoker(labels map[rune]int) map[rune]int {
+	jokerCount, hasJoker := labels['J']
+
+	if !hasJoker || jokerCount >= 5 {
+		return labels
+	}
+
+	delete(labels, 'J')
+
+	var sortedKeys []rune
+
+	for key := range labels {
+		sortedKeys = append(sortedKeys, key)
+	}
+
+	sort.SliceStable(sortedKeys, func(i, j int) bool {
+		iStrength := getCardStrengthWithJoker(sortedKeys[i]) + (labels[sortedKeys[i]] * 100)
+		jStrength := getCardStrengthWithJoker(sortedKeys[j]) + (labels[sortedKeys[j]] * 100)
+		return iStrength > jStrength
+	})
+
+	labels[sortedKeys[0]] = labels[sortedKeys[0]] + jokerCount
+
+	return labels
+}
+
+func getCardStrengthWithJoker(card rune) int {
+	if unicode.IsDigit(card) {
+		value, _ := strconv.Atoi(string(card))
+		return value
+	}
+
+	switch card {
+	case 'A':
+		return 14
+	case 'K':
+		return 13
+	case 'Q':
+		return 12
+	case 'J':
+		return 1
+	case 'T':
+		return 10
+	default:
+		log.Fatal("Invalid card label")
+	}
+
+	return 0
+}
+
+func getCardStrength(card rune) int {
+	if unicode.IsDigit(card) {
+		value, _ := strconv.Atoi(string(card))
+		return value
+	}
+
+	switch card {
+	case 'A':
+		return 14
+	case 'K':
+		return 13
+	case 'Q':
+		return 12
+	case 'J':
+		return 11
+	case 'T':
+		return 10
+	default:
+		log.Fatal("Invalid card label")
+	}
+
+	return 0
+}
+
+func getHandStrengthWithJoker(hand Hand) int64 {
+	strength := strconv.Itoa(int(hand.Type))
+
+	for _, card := range hand.Cards {
+		cardStrength := getCardStrengthWithJoker(card)
+		cardStrengthFormated := fmt.Sprintf("%0*d", 2, cardStrength)
+		strength = strength + cardStrengthFormated
+	}
+
+	value, _ := strconv.ParseInt(strength, 10, 64)
+	return value
+}
 
 func getHandStrength(hand Hand) int64 {
 	strength := strconv.Itoa(int(hand.Type))
 
 	for _, card := range hand.Cards {
-		if unicode.IsDigit(card) {
-			strength = strength + "0" + string(card)
-			continue
-		}
-
-		cardValue := 0
-		switch card {
-		case 'A':
-			cardValue = 14
-		case 'K':
-			cardValue = 13
-		case 'Q':
-			cardValue = 12
-		case 'J':
-			cardValue = 11
-		case 'T':
-			cardValue = 10
-		default:
-			log.Fatal("Invalid card label")
-		}
-
-		strength = strength + strconv.Itoa(cardValue)
+		cardStrength := getCardStrength(card)
+		cardStrengthFormated := fmt.Sprintf("%0*d", 2, cardStrength)
+		strength = strength + cardStrengthFormated
 	}
 
 	value, _ := strconv.ParseInt(strength, 10, 64)
